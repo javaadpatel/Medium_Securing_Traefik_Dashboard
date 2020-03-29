@@ -1,0 +1,34 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-dashboard
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`traefik.YOURDOMAIN.com`)
+      kind: Rule
+      services:
+        - name: api@internal
+          kind: TraefikService
+      middlewares:
+        - name: auth
+  tls:
+    certResolver: le
+    domains:
+      - main: YOURDOMAIN.com
+        sans:
+          - "*.YOURDOMAIN.com"
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: auth
+spec:
+  forwardAuth:
+    address: https://traefikauth.YOURDOMAIN.com/_oauth
+    trustForwardHeader: true
+    authResponseHeaders:
+      - X-Forwarded-User

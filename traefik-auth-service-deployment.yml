@@ -1,0 +1,89 @@
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: traefikauth
+  namespace: default
+  labels:
+    app: containous
+    name: traefikauth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: containous
+      task: traefikauth
+  template:
+    metadata:
+      labels:
+        app: containous
+        task: traefikauth
+    spec:
+      containers:
+        - name: traefikauth
+          image: thomseddon/traefik-forward-auth:2
+          ports:
+            - containerPort: 4181
+              protocol: TCP
+          env:
+            - name: DEFAULT_PROVIDER
+              value: "oidc"
+            - name: PROVIDERS_OIDC_ISSUER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: authenticationserver
+                  key: issuerurl
+            - name: PROVIDERS_OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: authenticationserver
+                  key: clientid
+            - name: PROVIDERS_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: authenticationserver
+                  key: clientsecret
+            - name: SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: authenticationserver
+                  key: jwtsecret
+            - name: LOG_LEVEL
+              value: trace
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefikauth
+  namespace: default
+
+spec:
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 4181
+  selector:
+    app: containous
+    task: traefikauth
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefikauth-route
+  namespace: default
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`traefikauth.YOURDOMAIN.com`)
+      kind: Rule
+      services:
+        - name: traefikauth
+          port: 80
+  tls:
+    certResolver: le
+    domains:
+      - main: YOURDOMAIN.com
+        sans:
+          - "*.YOURDOMAIN.com"
